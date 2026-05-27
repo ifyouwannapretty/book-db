@@ -29,6 +29,22 @@
   .book-meta { font-size: 12px; color: #888; margin-top: 2px; }
   .book-right { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
   .badge-dup { font-size: 11px; padding: 2px 7px; border-radius: 20px; background: #fff3cd; color: #856404; font-weight: 500; border: 1px solid #f5d97a; white-space: nowrap; }
+  .stat-dup-btn { cursor: pointer; background: #fff; border: 1px solid #f5d97a; border-radius: 8px; padding: 10px 14px; text-align: left; font-family: inherit; width: 100%; transition: background 0.15s; }
+  .stat-dup-btn:hover { background: #fff8e6; }
+  .stat-dup-btn .stat-label { font-size: 11px; color: #856404; margin-bottom: 3px; }
+  .stat-dup-btn .stat-num { font-size: 20px; font-weight: 600; color: #856404; }
+  .stat-dup-btn .stat-hint { font-size: 10px; color: #b38a00; margin-top: 2px; }
+  .dup-panel { display: none; background: #fffbf0; border: 1px solid #f5d97a; border-radius: 10px; padding: 14px 16px; margin-bottom: 1rem; }
+  .dup-panel.open { display: block; }
+  .dup-panel-title { font-size: 13px; font-weight: 600; color: #7a5900; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+  .dup-panel-close { background: none; border: none; cursor: pointer; font-size: 16px; color: #b38a00; line-height: 1; padding: 0; }
+  .dup-group { margin-bottom: 12px; }
+  .dup-group:last-child { margin-bottom: 0; }
+  .dup-group-label { font-size: 11px; color: #888; margin-bottom: 5px; }
+  .dup-item { display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid #f5d97a; border-radius: 7px; padding: 7px 10px; margin-bottom: 4px; }
+  .dup-item:last-child { margin-bottom: 0; }
+  .dup-item-title { font-size: 13px; font-weight: 500; flex: 1; }
+  .dup-item-date { font-size: 11px; color: #888; }
   .del-btn { background: none; border: none; cursor: pointer; color: #ccc; font-size: 15px; padding: 3px 5px; border-radius: 4px; line-height: 1; }
   .del-btn:hover { color: #e53935; background: #fff0f0; }
   .empty { text-align: center; padding: 3rem 0; color: #aaa; font-size: 14px; }
@@ -70,10 +86,11 @@
   </div>
   <div class="stats">
     <div class="stat"><div class="stat-label">전체 책</div><div class="stat-num" id="statTotal">0</div></div>
-    <div class="stat"><div class="stat-label">중복 의심</div><div class="stat-num" id="statDup">0</div></div>
+    <button class="stat-dup-btn" onclick="toggleDupPanel()"><div class="stat-label">⚠ 중복 의심</div><div class="stat-num" id="statDup">0</div><div class="stat-hint">클릭해서 보기 ▾</div></button>
     <div class="stat"><div class="stat-label">구매 기간</div><div class="stat-num" id="statPeriod" style="font-size:13px;padding-top:5px">-</div></div>
     <div class="stat"><div class="stat-label">검색 결과</div><div class="stat-num" id="statFiltered">0</div></div>
   </div>
+  <div class="dup-panel" id="dupPanel"><div class="dup-panel-title"><span>⚠ 중복 의심 도서</span><button class="dup-panel-close" onclick="toggleDupPanel()">✕</button></div><div id="dupPanelBody"></div></div>
   <div class="dup-banner" id="dupBanner">⚠ <span id="dupBannerText"></span></div>
   <div class="book-list" id="bookList"></div>
   <div class="pg" id="pgBar"></div>
@@ -247,7 +264,7 @@ function render() {
           <div class="book-meta">${b.date||''}${b.author?' · '+esc(b.author):''}</div>
         </div>
         <div class="book-right">
-          ${dupIds.has(b.id) ? '<span class="badge-dup">⚠ 중복</span>' : ''}
+          ${dupIds.has(b.id) ? `<span class="badge-dup">⚠ 중복<span class="tooltip">→ "${findDups(b.title, b.id).map(d=>d.title).join('", "')}"</span></span>` : ''}
           <button class="del-btn" onclick="delBook(${b.id})" title="삭제">✕</button>
         </div>
       </div>`).join('');
@@ -297,6 +314,31 @@ function saveBook() {
   if (!title) { alert('제목을 입력해주세요'); return; }
   books.unshift({ id: Date.now(), title, author: document.getElementById('fAuthor').value.trim(), date: document.getElementById('fDate').value });
   save(); closeModal(); page=1; render();
+}
+
+
+function toggleDupPanel() {
+  const panel = document.getElementById('dupPanel');
+  const isOpen = panel.classList.contains('open');
+  if (isOpen) { panel.classList.remove('open'); return; }
+  const dupIds = getDupIds();
+  if (!dupIds.size) return;
+  const visited = new Set();
+  const groups = [];
+  books.forEach(b => {
+    if (visited.has(b.id)) return;
+    const dups = findDups(b.title, b.id);
+    if (!dups.length) return;
+    const group = [b, ...dups];
+    group.forEach(x => visited.add(x.id));
+    groups.push(group);
+  });
+  document.getElementById('dupPanelBody').innerHTML = groups.map((group, i) =>
+    '<div class="dup-group"><div class="dup-group-label">중복 그룹 ' + (i+1) + '</div>' +
+    group.map(b => '<div class="dup-item"><span class="dup-item-title">' + esc(b.title) + '</span><span class="dup-item-date">' + (b.date||'') + '</span></div>').join('') +
+    '</div>'
+  ).join('');
+  panel.classList.add('open');
 }
 
 init();
